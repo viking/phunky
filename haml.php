@@ -7,39 +7,54 @@ class Haml {
 }
 
 class HamlNode {
-  var $contents, $level;
+  var $contents, $level, $closed;
   function __construct($level = 0) {
     $this->contents = "";
     $this->level = $level;
+    $this->closed = false;
   }
 
   function append($node) {
+    if ($this->closed)
+      return false;
+
     $this->contents .= $node;
+    return true;
   }
 
   function __toString() {
-    if ($this->level == -1)
-      return $this->contents;
+//    if ($this->level == -1)
+//      return $this->contents;
+//
+//    return Haml::indent($this->level) . $this->contents;
+    return $this->contents;
+  }
 
-    return Haml::indent($this->level) . $this->contents;
+  function close() {
+    $this->closed = true;
   }
 }
 
 class HamlTag extends HamlNode {
-  var $name, $attribs, $m;
+  var $name, $attribs, $closed;
 
   function __construct($name, $level = 0, $attribs = array()) {
     parent::__construct($level);
     $this->name = $name;
     $this->attribs = $attribs;
+    $this->self_closed = false;
   }
 
   function __toString() {
 //    $indent = Haml::indent($this->level);
 //    return $indent . "<". $this->name . $this->html_attributes() . ">" .
 //      $this->contents . $indent . "</" . $this->name . ">";
-    return "<". $this->name . $this->html_attributes() . ">" .
-      $this->contents . "</" . $this->name . ">";
+    $str = "<". $this->name . $this->html_attributes();
+    if ($this->self_closed) {
+      $str .= " />";
+      return $str;
+    }
+    return $str.">".$this->contents."</".$this->name.">";
   }
 
   function html_attributes() {
@@ -51,9 +66,42 @@ class HamlTag extends HamlNode {
     return $retval;
   }
 
-  function set_haml_attribs(&$str) {
+  function set_attribs(&$str) {
     $str = preg_replace('/\s*:(\w+)\s*=>/', '"$1" =>', $str);
     eval("\$this->attribs = array($str);");
+  }
+
+  function set_id_and_class(&$str) {
+    $offset = 0;
+    $len = strlen($str);
+    $m = array();
+    while ($offset < $len) {
+      preg_match("/([#.])([\w-]+)/", $str, $m, 0, $offset);
+      $offset += strlen($m[0]);
+      if ($m[1] == "#") {
+        $this->attribs['id'] = $m[2];
+      }
+      else {
+        if (!array_key_exists('class', $this->attribs)) {
+          $this->attribs['class'] = $m[2];
+        }
+        else {
+          $this->attribs['class'] .= ' '.$m[2];
+        }
+      }
+    }
+  }
+
+  function self_close() {
+    $this->close();
+    $this->self_closed = true;
+  }
+}
+
+class HamlText extends HamlNode {
+  function __construct($text, $level = 0) {
+    parent::__construct($level);
+    $this->contents = $text;
   }
 }
 
@@ -95,16 +143,40 @@ class HamlParser {
         ////////////////////////////
         //// main parsing logic ////
         ////////////////////////////
-        if ($m = $this->match("/^%(\w+)/")) {
+        if ($m = $this->match("/^([#.]|%)([\w-]+)/")) {
           // % - xhtml tag
-          $node = new HamlTag($m[1], $this->level);
-
-          if ($m = $this->match('/^{((:\w+ => .+?(,\s*)?)+)}/')) {
-            // ex: %p{:huge => "small", :omg => "medium"}
-            $node->set_haml_attribs($m[1]);
+          if ($m[1] == "#" || $m[1] == ".") {
+            // handle implicit div
+            $node = new HamlTag('div', $this->level);
+            $node->set_id_and_class($m[0]);
+          }
+          else {
+            $node = new HamlTag($m[2], $this->level);
           }
 
-          // FIXME
+          // id and class
+          // ex: %div#bar.foo
+          if ($m = $this->match('/^([#.][\w-]+)+/')) {
+            $node->set_id_and_class($m[0]);
+          }
+
+          // attributes
+          // ex: %p{:huge => "small", :omg => "medium"}
+          if ($m = $this->match('/^{((:\w+ => .+?(,\s*)?)+)}/')) {
+            $node->set_attribs($m[1]);
+          }
+
+          // self-closed
+          // ex: %br/
+          if ($m = $this->match('/^\//')) {
+            $node->self_close();
+          }
+
+          // content
+          if ($m = $this->match('/^\s*(.+)$/')) {
+            $this->try_append($node, new HamlText($m[1]));
+            $node->close();
+          }
         }
         else {
           $this->report('invalid haml');
@@ -115,13 +187,13 @@ class HamlParser {
 
       if ($diff <= 0) {
         // first close previous tag
-        $this->last()->append($prev_node);
+        $this->try_append($this->last(), $prev_node);
 
         if ($diff < 0) {
           // went up at least one level; start closing tags
           for ($i = -1; $i > $diff; $i--) {
             $child = array_pop($this->tree);
-            $this->last()->append($child);
+            $this->try_append($this->last(), $child);
           }
         }
       }
@@ -154,22 +226,30 @@ class HamlParser {
   }
 
   function report($msg) {
-    trigger_error("haml error on line " . $this->line_number . ": $msg");
+    die("haml error on line " . $this->line_number . ": $msg\n");
   }
 
   // Match $this->line with pattern; chops off $this->line on success
   function match($pattern) {
+//    echo "before: <".$this->line.">\n";
     $m = array();
     if (preg_match($pattern, $this->line, $m)) {
       $len = strlen($m[0]);
       $this->line = ($len < strlen($this->line)) ? substr($this->line, $len) : "";
+//      echo "after: <".$this->line.">\n";
       return $m;
     }
+//    echo "after: <".$this->line.">\n";
     return false;
   }
 
   function &last() {
     return $this->tree[count($this->tree)-1];
+  }
+
+  function try_append(&$node, &$content) {
+    if (!$node->append($content))
+      $this->report('tag already closed');
   }
 }
 ?>
