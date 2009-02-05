@@ -2,68 +2,54 @@
 class Haml {
   const indent = 2;   // 2 spaces per indent level
   static function indent($num) {
-    return str_repeat(" ", $num * Haml::indent);
+    return ($num > 0) ? str_repeat(" ", $num * Haml::indent) : '';
   }
 }
 
-class HamlNode {
-  var $contents, $level, $closed;
-  function __construct($level = 0) {
-    $this->contents = "";
-    $this->level = $level;
+abstract class HamlNode {
+  var $closed;
+  function __construct() {
+    $this->children = array();
     $this->closed = false;
   }
 
-  function append($node) {
+  function append(&$child) {
     if ($this->closed)
       return false;
 
-    $this->contents .= $node;
+    array_push($this->children, &$child);
     return true;
-  }
-
-  function __toString() {
-//    if ($this->level == -1)
-//      return $this->contents;
-//
-//    return Haml::indent($this->level) . $this->contents;
-    return $this->contents;
   }
 
   function close() {
     $this->closed = true;
   }
+
+  abstract function to_s($level);
+}
+
+class HamlRoot extends HamlNode {
+  function __construct() {
+    parent::__construct();
+  }
+
+  function to_s($level) {
+    $retval = "";
+    foreach($this->children as $child) {
+      $retval .= $child->to_s(0) . "\n";
+    }
+    return $retval;
+  }
 }
 
 class HamlTag extends HamlNode {
-  var $name, $attribs, $closed;
+  var $name, $self_closed;
 
-  function __construct($name, $level = 0, $attribs = array()) {
-    parent::__construct($level);
+  function __construct($name, $attribs = array()) {
+    parent::__construct();
     $this->name = $name;
     $this->attribs = $attribs;
     $this->self_closed = false;
-  }
-
-  function __toString() {
-//    $indent = Haml::indent($this->level);
-//    return $indent . "<". $this->name . $this->html_attributes() . ">" .
-//      $this->contents . $indent . "</" . $this->name . ">";
-    $str = "<". $this->name . $this->html_attributes();
-    if ($this->self_closed) {
-      $str .= " />";
-      return $str;
-    }
-    return $str.">".$this->contents."</".$this->name.">";
-  }
-
-  function html_attributes() {
-    $retval = '';
-    foreach ($this->attribs as $key => $val) {
-      if (!$val) continue;
-      $retval .= " $key=\"".htmlspecialchars($val, ENT_COMPAT, "ISO-8859-1", false)."\"";
-    }
-    return $retval;
   }
 
   function set_attribs(&$str) {
@@ -96,12 +82,49 @@ class HamlTag extends HamlNode {
     $this->close();
     $this->self_closed = true;
   }
+
+  function html_attributes() {
+    $retval = '';
+    foreach ($this->attribs as $key => $val) {
+      if (!$val) continue;
+      $retval .= " $key=\"".htmlspecialchars($val, ENT_COMPAT, "ISO-8859-1", false)."\"";
+    }
+    return $retval;
+  }
+
+  function to_s($level) {
+    $indent = Haml::indent($level);
+    $retval = "$indent<".$this->name.$this->html_attributes();
+    if ($this->self_closed) {
+      $retval .= " />";
+    }
+    else {
+      $retval .= ">\n";
+      foreach($this->children as $child) {
+        $retval .= $child->to_s($level+1) . "\n";
+      }
+      $retval .= "$indent</".$this->name.">";
+    }
+    return $retval;
+  }
 }
 
 class HamlText extends HamlNode {
-  function __construct($text, $level = 0) {
-    parent::__construct($level);
-    $this->contents = $text;
+  var $text;
+  function __construct($text) {
+    parent::__construct();
+    $this->text = $text;
+  }
+
+  function to_s($level) {
+    return Haml::indent($level) . $this->text;
+  }
+}
+
+class HamlPHP extends HamlText {
+  function __construct($code) {
+    eval("\$text = $code;");
+    parent::__construct($text);
   }
 }
 
@@ -117,10 +140,10 @@ class HamlParser {
 
   function compile() {
     $input = fopen($this->filename, 'r');
-    $node  = new HamlNode(-1);
+    $root = new HamlRoot();
+    $prev_node =& $root;
     while (true) {
-      $prev_node = $node;
-      $node = $diff = $new_level = null;
+      $diff = null;
 
       $this->line = fgets($input);
       if ($this->line === false) {
@@ -143,15 +166,18 @@ class HamlParser {
         ////////////////////////////
         //// main parsing logic ////
         ////////////////////////////
-        if ($m = $this->match("/^([#.]|%)([\w-]+)/")) {
+        if ($m = $this->match("/^=(.+)$/")) {
+          $node =& new HamlPHP($m[1]);
+        }
+        elseif ($m = $this->match("/^([#.]|%)([\w-]+)/")) {
           // % - xhtml tag
           if ($m[1] == "#" || $m[1] == ".") {
             // handle implicit div
-            $node = new HamlTag('div', $this->level);
+            $node =& new HamlTag('div');
             $node->set_id_and_class($m[0]);
           }
           else {
-            $node = new HamlTag($m[2], $this->level);
+            $node =& new HamlTag($m[2]);
           }
 
           // id and class
@@ -172,41 +198,53 @@ class HamlParser {
             $node->self_close();
           }
 
-          // content
-          if ($m = $this->match('/^\s*(.+)$/')) {
+          if ($m = $this->match('/^=(.+)$/')) {
+            // eval code and set as content
+            $this->try_append($node, new HamlPHP($m[1]));
+            $node->close();
+          }
+          elseif ($m = $this->match('/^\s*(.+)$/')) {
+            // text
             $this->try_append($node, new HamlText($m[1]));
             $node->close();
           }
         }
         else {
-          $this->report('invalid haml');
+          // text node
+          $node =& new HamlText($this->line);
         }
       }
 //      echo "new level: ".$this->level."; diff: $diff\n";
 //      echo "node: $node\n";
 
-      if ($diff <= 0) {
-        // first close previous tag
+      if ($diff == 0) {
+        $this->try_append($this->last(), $prev_node);
+      }
+      elseif ($diff < 0) {
+        // went up at least one level; start closing tags
         $this->try_append($this->last(), $prev_node);
 
-        if ($diff < 0) {
-          // went up at least one level; start closing tags
-          for ($i = -1; $i > $diff; $i--) {
-            $child = array_pop($this->tree);
-            $this->try_append($this->last(), $child);
-          }
+        for ($i = -1; $i > $diff; $i--) {
+          // append last element to next to last
+          // NOTE: i can't just pop and append because of reference weirdness
+          $from = count($this->tree) - 1;
+          $to   = $from - 1;
+          $this->try_append($this->tree[$to], $this->tree[$from]);
+          array_pop($this->tree);
         }
       }
       else {
         // $diff == 1
         // push prev tag onto the tree
-        array_push($this->tree, $prev_node);
+        array_push($this->tree, &$prev_node);
       }
 
       if (feof($input)) {
         // all done!
-        return $this->last()->__toString();
+        return $this->last()->to_s(0);
       }
+
+      $prev_node =& $node;
     }
   }
 
@@ -231,15 +269,12 @@ class HamlParser {
 
   // Match $this->line with pattern; chops off $this->line on success
   function match($pattern) {
-//    echo "before: <".$this->line.">\n";
     $m = array();
     if (preg_match($pattern, $this->line, $m)) {
       $len = strlen($m[0]);
       $this->line = ($len < strlen($this->line)) ? substr($this->line, $len) : "";
-//      echo "after: <".$this->line.">\n";
       return $m;
     }
-//    echo "after: <".$this->line.">\n";
     return false;
   }
 
@@ -247,8 +282,12 @@ class HamlParser {
     return $this->tree[count($this->tree)-1];
   }
 
-  function try_append(&$node, &$content) {
-    if (!$node->append($content))
+  function try_append(&$parent, &$child) {
+//    echo("=== parent ===\n");
+//    var_dump($parent);
+//    echo("=== child ===\n");
+//    var_dump($child);
+    if (!$parent->append($child))
       $this->report('tag already closed');
   }
 }
