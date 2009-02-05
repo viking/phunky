@@ -109,6 +109,17 @@ class HamlTag extends HamlNode {
   }
 }
 
+class HamlComment extends HamlNode {
+  function to_s($level) {
+    $indent = Haml::indent($level);
+    $retval = "$indent<!--\n";
+    foreach($this->children as $child) {
+      $retval .= $child->to_s($level+1) . "\n";
+    }
+    $retval .= "$indent-->";
+  }
+}
+
 class HamlText extends HamlNode {
   var $text;
   function __construct($text) {
@@ -169,6 +180,11 @@ class HamlParser {
         if ($m = $this->match("/^=(.+)$/")) {
           $node =& new HamlPHP($m[1]);
         }
+        elseif ($m = $this->match("/^\//")) {
+          // comment (block)
+          $node =& new HamlComment();
+          $this->add_inline_content($node);
+        }
         elseif ($m = $this->match("/^([#.]|%)([\w-]+)/")) {
           // % - xhtml tag
           if ($m[1] == "#" || $m[1] == ".") {
@@ -198,16 +214,8 @@ class HamlParser {
             $node->self_close();
           }
 
-          if ($m = $this->match('/^=(.+)$/')) {
-            // eval code and set as content
-            $this->try_append($node, new HamlPHP($m[1]));
-            $node->close();
-          }
-          elseif ($m = $this->match('/^\s*(.+)$/')) {
-            // text
-            $this->try_append($node, new HamlText($m[1]));
-            $node->close();
-          }
+          // add inline content if it exists
+          $this->add_inline_content($node);
         }
         else {
           // text node
@@ -225,6 +233,7 @@ class HamlParser {
         $this->try_append($this->last(), $prev_node);
 
         for ($i = -1; $i > $diff; $i--) {
+          var_dump($this->tree);
           // append last element to next to last
           // NOTE: i can't just pop and append because of reference weirdness
           $from = count($this->tree) - 1;
@@ -289,6 +298,19 @@ class HamlParser {
 //    var_dump($child);
     if (!$parent->append($child))
       $this->report('tag already closed');
+  }
+
+  function add_inline_content(&$node) {
+    if ($m = $this->match('/^=(.+)$/')) {
+      // eval code and set as content
+      $this->try_append($node, new HamlPHP($m[1]));
+      $node->close();
+    }
+    elseif ($m = $this->match('/^\s*(.+)$/')) {
+      // text
+      $this->try_append($node, new HamlText($m[1]));
+      $node->close();
+    }
   }
 }
 ?>
