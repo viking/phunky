@@ -21,13 +21,13 @@ class Phunky {
   }
 
   function code_template($str, $echo = false) {
-    return '<?php '.(($echo) ? "echo " : "").$str.'; ?>';
+    return '<?php '.(($echo) ? "echo " : "").$str.' ?>';
   }
 
   function compile() {
     $input = fopen($this->filename, 'r');
     $level = -1;
-    $template = "<?php include('haml.php') ?>";
+    $template = "";
     $closing_tags = array();
     $previous_closing = "";
     $m = array();   // for regex matches
@@ -66,7 +66,20 @@ class Phunky {
 
         // php code
         if (preg_match("/^(=|-)\s*(.+)$/", $line, $m)) {
-          $newline .= $this->code_template($m[2], ($m[1] == "="));
+          $char = $m[1];
+          $code = $m[2];
+          if ($char == "=") {
+            $code .= '; echo "\n";';
+          }
+          else {
+            if (substr($m[2], -1) == "{") {
+              $closing = "<?php } ?>";
+            }
+            else {
+              $code .= ';';
+            }
+          }
+          $newline .= $this->code_template($code, $char == '=');
         }
         // comment
         elseif (preg_match("/^\/\s*(.+)?$/", $line, $m)) {
@@ -179,7 +192,10 @@ class Phunky {
       if ($diff == 1) {
         // current node is child of previous node
         // push closing tag of previous node onto stack
-        $template .= "\n";
+        if ($template) {
+          // this happens for all but the first iteration
+          $template .= "\n";
+        }
         if ($previous_closing === null)
           $this->report("illegal nesting");
 
@@ -194,7 +210,7 @@ class Phunky {
         for ($i = 0; $i > $diff; $i--) {
           $tag = array_pop($closing_tags);
           if ($tag) {
-            // the only time this doesn't run is for the 'root' node closing
+            // this happens for all but the last iteration
             $template .= $tag . "\n";
           }
         }
