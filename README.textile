@@ -15,11 +15,11 @@ Unsupported modifiers:
 * [] (I'm not sure this one is even possible in PHP)
 
 Filters don't do string interpolation.  Use PHP tags instead.  Ex:
-<code>
+<pre>
 :plain
   foo
   <?php echo 'bar!' ?>
-</code>
+</pre>
 
 User filters are implemented via functions instead of classes.  The
 user-defined function should accept one argument (the filter text).
@@ -34,7 +34,7 @@ h3. Caveats
 
 h3. Example use
 
-<code>
+<pre>
 <?php
 require 'phunky.php';
 
@@ -50,4 +50,4 @@ echo $template;
 echo "=========== result ===========\n";
 require 'template.php';
 ?>
-</code>
+</pre>
