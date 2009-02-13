@@ -1,5 +1,5 @@
 <?php
-class HamlParser {
+class Phunky {
   var $filename, $level, $tree, $line_number, $line;
 
   static function html_attributes($attribs) {
@@ -131,7 +131,7 @@ class HamlParser {
           }
 
           if ($attribs != "") {
-            $newline .= "<?php echo HamlParser::html_attributes(array($attribs)); ?>";
+            $newline .= "<?php echo Phunky::html_attributes(array($attribs)); ?>";
           }
 
           if ($offset < strlen($line)) {
