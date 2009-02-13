@@ -1,1 +1,3 @@
 - add missing modifiers: < > ~ !!!
+- add filters
+- add ability to register handlers
