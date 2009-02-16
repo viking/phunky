@@ -2,7 +2,7 @@
 class Phunky {
   var $filename, $level, $tree, $line_number, $line;
 
-  // helpers
+  // helpers {{{1
   static function html_attributes($attribs) {
     $retval = '';
     foreach ($attribs as $key => $val) {
@@ -12,7 +12,7 @@ class Phunky {
     return $retval;
   }
 
-  // filters
+  // filters {{{1
   static $filter_handlers = array(
     'plain'      => array('Phunky', 'filter_plain'),
     'javascript' => array('Phunky', 'filter_javascript')
@@ -34,6 +34,7 @@ class Phunky {
       "</script>";
   }
 
+  // compiling helpers {{{1
   function __construct($filename) {
     $this->filename = $filename;
     $this->line_number = 0;
@@ -47,7 +48,9 @@ class Phunky {
     return '<?php '.(($echo) ? "echo " : "").$str.' ?>';
   }
 
+  // compile() {{{1
   function compile() {
+    // setup {{{2
     $input = fopen($this->filename, 'r');
     $level = -1;
     $template = "";
@@ -61,9 +64,11 @@ class Phunky {
     $new_filter_name = null;
     $current_filter_name = null;
     $in_filter = false;
+    // }}}2
 
     $m = array();   // for regex matches
     while (true) {
+      // main loop start {{{2
       $this->line_number++;
       $newline = null;
       $closing = null;
@@ -77,7 +82,7 @@ class Phunky {
       else {
         $line = rtrim($line);
 
-        // get level
+        // get level {{{2
         preg_match("/^\s*/", $line, $m);
         $len = strlen($m[0]);
         $new_level = $len / 2;
@@ -102,11 +107,7 @@ class Phunky {
 
         $level = $new_level;
 
-        //
-        // main parsing logic
-        //
-
-        // filter handling
+        // filter handling {{{2
         if ($in_filter && $level > $filter_level) {
           if ($filter_text) {
             $filter_text .= "\n";
@@ -114,12 +115,13 @@ class Phunky {
           $filter_text .= $line;
           continue;
         }
+        // normal handling {{{2
         else {
-          // escaped
+          // escaped {{{3
           if (preg_match('/^\\\/', $line)) {
             $newline = substr($line, 1);
           }
-          // php code
+          // php code {{{3
           elseif (preg_match("/^(=|-)\s*(.+)$/", $line, $m)) {
             $char = $m[1];
             $code = $m[2];
@@ -136,7 +138,7 @@ class Phunky {
             }
             $newline .= $this->code_template($code, $char == '=');
           }
-          // comment
+          // comment {{{3
           elseif (preg_match("/^\/(\[if IE.*?\])?\s*(.+)?$/", $line, $m)) {
             $newline .= '<!--';
             if ($m[1]) {
@@ -151,11 +153,13 @@ class Phunky {
               $closing  = null;
             }
           }
-          // xhtml tag
+          // xhtml tag {{{3
           elseif (preg_match("/^([#.%])([\w-]+)((?:[#.][\w-]+)+)?(?:{((?::\w+ => .+?(?:,\s*)?)+)})?/", $line, $m)) {
             $attribs = "";
             $id = ""; $class = "";
             $offset = strlen($m[0]);
+
+            // tag name {{{4
             if ($m[1] == "#" || $m[1] == ".") {
               // handle implicit div
               $newline = "<div";
@@ -172,7 +176,7 @@ class Phunky {
               $closing = "</".$m[2].">";
             }
 
-            // handle id/class attributes
+            // id/class attributes {{{4
             //   ex: %div#foo.bar
             if ($m[3]) {
               $x = array();
@@ -196,7 +200,7 @@ class Phunky {
               $attribs .= "'class' => '$class'";
             }
 
-            // handle general attributes
+            // general attributes {{{4
             //   ex: %div{:foo => 'bar', :baz => str_repeat("huge", 10)}
             if ($m[4]) {
               $str = preg_replace('/:(\w+)\s*=>/', '"$1" =>', $m[4]);
@@ -207,8 +211,8 @@ class Phunky {
               $newline .= "<?php echo Phunky::html_attributes(array($attribs)); ?>";
             }
 
+            // self-closing or content {{{4
             if ($offset < strlen($line)) {
-              // handle self-closing or content
               $str = substr($line, $offset);
               preg_match("/^(\/|=)?\s*(.+?)?$/", $str, $m);
               if ($m[1] == "/") {
@@ -234,7 +238,7 @@ class Phunky {
               $newline .= '>';
             }
           }
-          // filter
+          // filter {{{3
           elseif (preg_match('/^:(.+)$/', $line, $m)) {
             $new_filter_name = $m[1];
             if (!array_key_exists($new_filter_name, self::$filter_handlers))
@@ -243,14 +247,14 @@ class Phunky {
             $in_filter = true;
             $filter_level = $level;
           }
-          // text node
+          // text node {{{3
           else {
             $newline = $line;
           }
         }
       }
 
-      // now it's time to handle level differences
+      // level differences {{{2
       if ($diff <= 0) {
         // either the current node is a sibling of the previous node (diff == 0)
         // or the previous node was part of a tree that is now closed (diff < 0)
@@ -309,6 +313,7 @@ class Phunky {
         array_push($closing_tags, $previous_closing);
       }
 
+      // main loop end {{{2
       if ($done) {
         // this only happens at EOF
         break;
@@ -317,10 +322,12 @@ class Phunky {
       if ($newline)
         $template .= $indent . $newline;
       $previous_closing = ($closing === null) ? null : $indent . $closing;
+      // }}}2
     }
     return $template;
   }
 }
-// vim:fdm=expr:fdl=0
-// vim:fde=getline(v\:lnum)=~'^//'?'>'.(matchend(getline(v\:lnum),'//*')-2)\:'='
+// }}}1
+
+// vim:fdm=marker
 ?>
