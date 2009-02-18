@@ -60,10 +60,13 @@ class Phunky {
 
     // for filter handling
     $filter_text = null;
-    $filter_level = null;
+    $new_filter_level = null;
     $new_filter_name = null;
+    $current_filter_level = null;
     $current_filter_name = null;
     $in_filter = false;
+    $filter_end = false;
+    $filter_start = false;
     // }}}2
 
     $m = array();   // for regex matches
@@ -78,6 +81,9 @@ class Phunky {
         $diff  = -1 - $level;
         $level = -1;
         $done  = true;
+        if ($in_filter) {
+          $filter_end = true;
+        }
       }
       else {
         $line = rtrim($line);
@@ -86,12 +92,17 @@ class Phunky {
         preg_match("/^\s*/", $line, $m);
         $len = strlen($m[0]);
         $new_level = $len / 2;
-        if ($in_filter && $new_level > $filter_level) {
-          // since we're inside a filter, we only really care if the
-          // new level is less than or equal to the filter level, because
-          // that means the filter just finished
-          $line = substr($line, ($filter_level + 1) * 2);
-          $new_level = $filter_level + 1;
+        if ($in_filter) {
+          if ($new_level > $current_filter_level) {
+            // deeper levels don't matter when inside a filter
+            $line = substr($line, ($current_filter_level + 1) * 2);
+            $new_level = $current_filter_level;
+          }
+          else {
+            // we're out of the filter
+            $filter_end = true;
+            $line = substr($line, $len);
+          }
         }
         elseif ($len % 2 != 0) {
           $this->report("invalid indention ($len)");
@@ -108,7 +119,7 @@ class Phunky {
         $level = $new_level;
 
         // filter handling {{{2
-        if ($in_filter && $level > $filter_level) {
+        if ($in_filter && !$filter_end) {
           if ($filter_text) {
             $filter_text .= "\n";
           }
@@ -245,7 +256,8 @@ class Phunky {
               $this->report("unsupported filter: ".$new_filter_name);
 
             $in_filter = true;
-            $filter_level = $level;
+            $filter_start = true;
+            $new_filter_level = $level;
           }
           // text node {{{3
           else {
@@ -254,39 +266,46 @@ class Phunky {
         }
       }
 
+      // filter start/end {{{2
+      if ($in_filter) {
+        // execution gets here under one of the following circumstances:
+        //   - a new filter just started after a non-filter
+        //   - a new filter just started right after the current filter finished
+        //   - the current filter just finished
+        if ($filter_end) {
+          // the current filter just finished; process it
+          $callback = self::$filter_handlers[$current_filter_name];
+          $result = call_user_func($callback, $filter_text);
+
+          // indent the result
+          $indent = str_repeat("  ", $current_filter_level);
+          $template .= $indent . preg_replace("/\n/", "\n$indent", $result);
+          $filter_end = false;
+        }
+
+        if ($filter_start) {
+          // a new filter just started
+          $current_filter_name = $new_filter_name;
+          $current_filter_level = $new_filter_level;
+          $new_filter_name = $new_filter_level = null;
+          $filter_text = "";
+          $filter_start = false;
+        }
+        else {
+          // non-filter followed the current filter
+          $current_filter_name = $filter_text = $current_filter_level = null;
+          $in_filter = false;
+        }
+      }
+
       // level differences {{{2
       if ($diff <= 0) {
         // either the current node is a sibling of the previous node (diff == 0)
         // or the previous node was part of a tree that is now closed (diff < 0)
 
-        if ($in_filter && $level <= $filter_level) {
-          // execution gets here under one of the following circumstances:
-          //   - a new filter just started after a non-filter
-          //   - a new filter just started right after the current filter finished
-          //   - the current filter just finished
-          if ($current_filter_name) {
-            // the current filter just finished; process it
-            $callback = self::$filter_handlers[$current_filter_name];
-            $template .= call_user_func($callback, $filter_text);
-          }
-
-          if ($new_filter_name) {
-            // a new filter just started
-            $current_filter_name = $new_filter_name;
-            $new_filter_name = null;
-            $filter_text = "";
-          }
-          else {
-            // non-filter followed the current filter
-            $current_filter_name = $filter_text = $filter_level = null;
-            $in_filter = false;
-          }
-        }
-        elseif ($previous_closing) {
+        if ($previous_closing) {
           $template .= trim($previous_closing);
         }
-        // filter_start is only true when the current line is :foo
-        $filter_start = false;
         $template .= "\n";
 
         if ($diff < 0) {
