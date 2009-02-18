@@ -1,3 +1,4 @@
 - add missing modifiers: < > ~ !!! | []
 - add ability to register handlers
 - add string interpolation for filters using ruby syntax (#{}) (?)
+- filters don't work correctly if they're on the first line
