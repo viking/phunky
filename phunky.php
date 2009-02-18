@@ -75,6 +75,7 @@ class Phunky {
       $this->line_number++;
       $newline = null;
       $closing = null;
+      $no_indent = false;
       $line = fgets($input);
       if ($line === false) {
         // EOF
@@ -140,6 +141,7 @@ class Phunky {
               $code .= '; echo "\n";';
             }
             else {
+              $no_indent = true;
               if (substr($m[2], -1) == "{") {
                 $closing = "<?php } ?>";
               }
@@ -165,7 +167,7 @@ class Phunky {
             }
           }
           // xhtml tag {{{3
-          elseif (preg_match("/^([#.%])([\w-]+)((?:[#.][\w-]+)+)?(?:{((?::\w+ => .+?(?:,\s*)?)+)})?/", $line, $m)) {
+          elseif (preg_match("/^([#.%])([\w-]+)((?:[#.][\w-]+)+)?(?:{((?:\s*:\w+ => .+?\s*,?)+)})?/", $line, $m)) {
             $attribs = "";
             $id = ""; $class = "";
             $offset = strlen($m[0]);
@@ -337,7 +339,7 @@ class Phunky {
         // this only happens at EOF
         break;
       }
-      $indent = str_repeat("  ", $level);
+      $indent = ($no_indent) ? "" : str_repeat("  ", $level);
       if ($newline)
         $template .= $indent . $newline;
       $previous_closing = ($closing === null) ? null : $indent . $closing;
