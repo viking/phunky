@@ -1,3 +1,13 @@
+
+Testing out textile...
+
+.p Here's a list:
+* one
+* two
+* three
+
+.p Blah blah blah
+
 h2. Phunky
 
 Phunky is Haml parser written in PHP.  It's purpose is to be as close to the
@@ -48,12 +58,3 @@ echo "=========== result ===========\n";
 require 'template.php';
 ?>
 </pre>
-
-Testing out textile...
-
-.p Here's a list:
-* one
-* two
-* three
-
-.p Blah blah blah
