@@ -1,27 +1,27 @@
 h2. Phunky
 
-p. Phunky is Haml parser written in PHP.  It's purpose is to be as close to the
+Phunky is Haml parser written in PHP.  It's purpose is to be as close to the
 Ruby Haml parser as possible.  Just about all of the
 "Haml specification":http://haml.hamptoncatlin.com is covered.  See below for a
 list of differences.
 
 h3. Differences
 
-p. Unsupported modifiers:
+Unsupported modifiers:
 * < and >
 * ~
 * !!!
 * |
 * [] (I'm not sure this one is even possible in PHP)
 
-p. Filters don't do string interpolation.  Use PHP tags instead.  Ex:
+Filters don't do string interpolation.  Use PHP tags instead.  Ex:
 <pre>
 :plain
   foo
   <?php echo 'bar!' ?>
 </pre>
 
-p. User filters are implemented via functions instead of classes.  The
+User filters are implemented via functions instead of classes.  The
 user-defined function should accept one argument (the filter text).
 
 h3. Bundled filters
@@ -48,3 +48,12 @@ echo "=========== result ===========\n";
 require 'template.php';
 ?>
 </pre>
+
+Testing out textile...
+
+.p Here's a list:
+* one
+* two
+* three
+
+.p Blah blah blah
