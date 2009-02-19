@@ -1,13 +1,3 @@
-
-Testing out textile...
-
-.p Here's a list:
-* one
-* two
-* three
-
-.p Blah blah blah
-
 h2. Phunky
 
 Phunky is Haml parser written in PHP.  It's purpose is to be as close to the
@@ -17,22 +7,20 @@ list of differences.
 
 h3. Differences
 
-Unsupported modifiers:
-* < and >
-* ~
-* !!!
-* |
-* [] (I'm not sure this one is even possible in PHP)
-
-Filters don't do string interpolation.  Use PHP tags instead.  Ex:
+* Unsupported modifiers:
+** < and >
+** ~
+** !!!
+** |
+** [] (I'm not sure this one is even possible in PHP)
+* Filters don't do string interpolation.  Use PHP tags instead.  Ex:
 <pre>
 :plain
   foo
   <?php echo 'bar!' ?>
 </pre>
-
-User filters are implemented via functions instead of classes.  The
-user-defined function should accept one argument (the filter text).
+* User filters are implemented via functions instead of classes.  The
+  user-defined function should accept one argument (the filter text).
 
 h3. Bundled filters
 
