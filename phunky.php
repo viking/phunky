@@ -44,8 +44,8 @@ class Phunky {
     die("haml error on line " . $this->line_number . ": $msg\n");
   }
 
-  function code_template($str, $echo = false) {
-    return '<?php '.(($echo) ? "echo " : "").$str.' ?>';
+  function code_template($str, $echo = false, $closed = true) {
+    return '<?php '.(($echo) ? "echo " : "").$str.(($closed) ? ' ?>' : '');
   }
 
   // compile() {{{1
@@ -56,7 +56,8 @@ class Phunky {
     $template = "";
     $closing_tags = array();
     $previous_closing = "";
-    $done = false;
+    $previous_node_type = null;
+    $node_type = "root";
 
     // for filter handling
     $filter_text = null;
@@ -76,12 +77,16 @@ class Phunky {
       $newline = null;
       $closing = null;
       $no_indent = false;
+      $previous_node_type = $node_type;
+      $node_type = null;
       $line = fgets($input);
+//      echo "previous_node_type: &lt;$previous_node_type&gt;<br/>\n";
+//      echo "<!-- <".chop($line)."> -->\n";
       if ($line === false) {
         // EOF
         $diff  = -1 - $level;
         $level = -1;
-        $done  = true;
+        $node_type = "eof";
         if ($in_filter) {
           $filter_end = true;
         }
@@ -90,8 +95,15 @@ class Phunky {
         $line = rtrim($line);
 
         // get level {{{2
-        preg_match("/^\s*/", $line, $m);
-        $len = strlen($m[0]);
+        preg_match("/^(\s*)(\S.*)?$/", $line, $m);
+        if (!$m[2]) {
+          $node_type = "empty";
+          if ($in_filter && $filter_text) {
+            $filter_text .= "\n";
+          }
+          continue;
+        }
+        $len = strlen($m[1]);
         $new_level = $len / 2;
         if ($in_filter) {
           if ($new_level > $current_filter_level) {
@@ -125,6 +137,7 @@ class Phunky {
             $filter_text .= "\n";
           }
           $filter_text .= $line;
+          $node_type = "filter-text";
           continue;
         }
         // normal handling {{{2
@@ -132,24 +145,25 @@ class Phunky {
           // escaped {{{3
           if (preg_match('/^\\\/', $line)) {
             $newline = substr($line, 1);
+            $node_type = "text";
           }
           // php code {{{3
           elseif (preg_match("/^(=|-)\s*(.+)$/", $line, $m)) {
             $char = $m[1];
             $code = $m[2];
             if ($char == "=") {
+              $node_type = "php-inline";
               $code .= '; echo "\n";';
+              $newline .= $this->code_template($code, true);
             }
             else {
+              // NOTE: non-echoing php nodes are intentionally left open
+              // because they may or may not have child nodes
+              $node_type = "php";
               $no_indent = true;
-              if (substr($m[2], -1) == "{") {
-                $closing = "<?php } ?>";
-              }
-              else {
-                $code .= ';';
-              }
+              $newline .= $this->code_template($code, false, false);
+              $closing = "; ?>";
             }
-            $newline .= $this->code_template($code, $char == '=');
           }
           // comment {{{3
           elseif (preg_match("/^\/(\[if IE.*?\])?\s*(.+)?$/", $line, $m)) {
@@ -165,9 +179,11 @@ class Phunky {
               $newline .= ' '.$m[2].' '.$closing;
               $closing  = null;
             }
+            $node_type = "comment";
           }
           // xhtml tag {{{3
           elseif (preg_match("/^([#.%])([\w-]+)((?:[#.][\w-]+)+)?(?:{((?:\s*:\w+ => .+?\s*,?)+)})?/", $line, $m)) {
+            $node_type = "tag";
             $attribs = "";
             $id = ""; $class = "";
             $offset = strlen($m[0]);
@@ -253,6 +269,7 @@ class Phunky {
           }
           // filter {{{3
           elseif (preg_match('/^:(.+)$/', $line, $m)) {
+            $node_type = "filter";
             $new_filter_name = $m[1];
             if (!array_key_exists($new_filter_name, self::$filter_handlers))
               $this->report("unsupported filter: ".$new_filter_name);
@@ -264,6 +281,7 @@ class Phunky {
           // text node {{{3
           else {
             $newline = $line;
+            $node_type = "text";
           }
         }
       }
@@ -324,6 +342,15 @@ class Phunky {
       elseif ($diff == 1) {
         // current node is child of previous node
         // push closing tag of previous node onto stack
+        if ($previous_node_type == "php") {
+          // this php node has a child! add a brace if there isn't already one
+          if (substr($template, -1) != "{") {
+            $template .= " {";
+          }
+          $template .= " ?>";
+          $previous_closing = "<?php } ?>";
+        }
+
         if ($template) {
           // this happens for all but the first iteration
           $template .= "\n";
@@ -335,8 +362,7 @@ class Phunky {
       }
 
       // main loop end {{{2
-      if ($done) {
-        // this only happens at EOF
+      if ($node_type == "eof") {
         break;
       }
       $indent = ($no_indent) ? "" : str_repeat("  ", $level);
