@@ -1,0 +1,73 @@
+       _                 _
+ _ __ | |__  _   _ _ __ | | ___   _
+| '_ \| '_ \| | | | '_ \| |/ / | | |
+| |_) | | | | |_| | | | |   <| |_| |
+| .__/|_| |_|\__,_|_| |_|_|\_\\__, |
+|_|                           |___/
+
+
+Phunky is Haml parser written in PHP.  It's purpose is to be as close to the
+Ruby Haml parser as possible.  Just about all of the Haml specification.  See below for a
+list of differences.
+
+.-------------.
+| Differences |
+`-------------'
+
+Unsupported modifiers:
+  * < and >
+  * ~
+  * !!!
+  * |
+  * []
+
+Filters don't do string interpolation.  Use PHP tags instead.  Ex:
+
+  :plain
+    foo
+    <?php echo 'bar!' ?>
+
+User filters are implemented via functions instead of classes.  The
+user-defined function should accept one argument (the filter text).
+
+PHP control structures do not require an opening brace.  Both of these
+blocks are equivalent:
+
+  - foreach($people as $person)
+    %p= $person->name
+  - foreach($people as $person) {
+    %p= $person->name
+
+.-----------------.
+| Bundled filters |
+`-----------------'
+
+  * plain
+  * javascript
+
+.-------------.
+| Example use |
+`-------------'
+
+<?php
+require 'phunky.php';
+
+$p = new Phunky($argv[1]);
+$template = $p->compile();
+
+$out = fopen("template.php", "w");
+fwrite($out, $template);
+fclose($out);
+
+echo "========== template ==========\n";
+echo $template;
+echo "=========== result ===========\n";
+require 'template.php';
+?>
+
+.------------.
+| References |
+`------------'
+
+HAML specification:
+  http://haml.hamptoncatlin.com
