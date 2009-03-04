@@ -371,7 +371,10 @@ class Phunky {
       $previous_closing = ($closing === null) ? null : $indent . $closing;
       // }}}2
     }
-    return $template;
+
+    // FIXME: this is a hack to make sure consecutive php blocks are merged
+    // together, otherwise if-else won't work correctly
+    return preg_replace('/\?>\n<\?php/', "\n", $template);
   }
 }
 // }}}1
