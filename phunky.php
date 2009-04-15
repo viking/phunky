@@ -15,7 +15,8 @@ class Phunky {
   // filters {{{1
   static $filter_handlers = array(
     'plain'      => array('Phunky', 'filter_plain'),
-    'javascript' => array('Phunky', 'filter_javascript')
+    'javascript' => array('Phunky', 'filter_javascript'),
+    'php'        => array('Phunky', 'filter_php')
   );
   static function filter_plain($text) {
     return $text;
@@ -32,6 +33,12 @@ class Phunky {
       "    " . preg_replace("/\n/", "\n    ", $text) . "\n" .
       "  //]]>\n" .
       "</script>";
+  }
+  static function filter_php($text) {
+    return
+      "<?php\n" .
+      "  " . preg_replace("/\n/", "\n  ", $text) . "\n" .
+      "?>";
   }
 
   // compiling helpers {{{1
