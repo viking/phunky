@@ -17,7 +17,7 @@ class Phunky {
     'plain'      => array('Phunky', 'filter_plain'),
     'javascript' => array('Phunky', 'filter_javascript'),
     'php'        => array('Phunky', 'filter_php'),
-    'silent'     => array('Phunky', 'filter_silent'),
+    'silent'     => array('Phunky', 'filter_silent')
   );
   static function filter_plain($text) {
     return $text;
@@ -160,7 +160,7 @@ class Phunky {
           }
           // filter {{{3
           // NOTE: silent comment blocks are handled as a noop filter
-          elseif (preg_match('/^(-#|:(.+)$)/', $line, $m)) {
+          elseif (preg_match('/^(-#|:(.+))$/', $line, $m)) {
             $node_type = "filter";
             $new_filter_name = ($m[1] == "-#") ? 'silent' : $m[2];
             if (!array_key_exists($new_filter_name, self::$filter_handlers))
@@ -173,7 +173,6 @@ class Phunky {
           // silent comment {{{3
           elseif (preg_match("/^-#/", $line)) {
             $node_type = "silent-comment";
-            $newline = "";
           }
           // php code {{{3
           elseif (preg_match("/^(=|-)\s*(.+)$/", $line, $m)) {
