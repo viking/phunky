@@ -16,7 +16,8 @@ class Phunky {
   static $filter_handlers = array(
     'plain'      => array('Phunky', 'filter_plain'),
     'javascript' => array('Phunky', 'filter_javascript'),
-    'php'        => array('Phunky', 'filter_php')
+    'php'        => array('Phunky', 'filter_php'),
+    'silent'     => array('Phunky', 'filter_silent'),
   );
   static function filter_plain($text) {
     return $text;
@@ -39,6 +40,9 @@ class Phunky {
       "<?php\n" .
       "  " . preg_replace("/\n/", "\n  ", $text) . "\n" .
       "?>";
+  }
+  static function filter_silent($_) {
+    return "";
   }
 
   // compiling helpers {{{1
@@ -153,6 +157,23 @@ class Phunky {
           if (preg_match('/^\\\/', $line)) {
             $newline = substr($line, 1);
             $node_type = "text";
+          }
+          // filter {{{3
+          // NOTE: silent comment blocks are handled as a noop filter
+          elseif (preg_match('/^(-#|:(.+)$)/', $line, $m)) {
+            $node_type = "filter";
+            $new_filter_name = ($m[1] == "-#") ? 'silent' : $m[2];
+            if (!array_key_exists($new_filter_name, self::$filter_handlers))
+              $this->report("unsupported filter: ".$new_filter_name);
+
+            $in_filter = true;
+            $filter_start = true;
+            $new_filter_level = $level;
+          }
+          // silent comment {{{3
+          elseif (preg_match("/^-#/", $line)) {
+            $node_type = "silent-comment";
+            $newline = "";
           }
           // php code {{{3
           elseif (preg_match("/^(=|-)\s*(.+)$/", $line, $m)) {
@@ -274,17 +295,6 @@ class Phunky {
               $newline .= '>';
             }
           }
-          // filter {{{3
-          elseif (preg_match('/^:(.+)$/', $line, $m)) {
-            $node_type = "filter";
-            $new_filter_name = $m[1];
-            if (!array_key_exists($new_filter_name, self::$filter_handlers))
-              $this->report("unsupported filter: ".$new_filter_name);
-
-            $in_filter = true;
-            $filter_start = true;
-            $new_filter_level = $level;
-          }
           // text node {{{3
           else {
             $newline = $line;
@@ -379,7 +389,7 @@ class Phunky {
       // }}}2
     }
 
-    // FIXME: this is a hack to make sure consecutive php blocks are merged
+    // SMELL: this is a hack to make sure consecutive php blocks are merged
     // together, otherwise if-else won't work correctly
     return preg_replace('/\?>\n<\?php/', "\n", $template);
   }
