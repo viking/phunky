@@ -6,7 +6,7 @@
 |_|                           |___/
 
 
-Phunky is Haml parser written in PHP.  It's purpose is to be as close to the
+Phunky is Haml parser written in PHP.  Its purpose is to be as close to the
 Ruby Haml parser as possible.  Just about all of the Haml specification is
 implemented.  See below for a list of differences.
 
