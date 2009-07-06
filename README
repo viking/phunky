@@ -45,6 +45,8 @@ blocks are equivalent:
   * plain
   * javascript
   * php
+  * preserve
+  * breaker (like plain, but inserts <br/> after each line of text)
 
 .-------------.
 | Example use |

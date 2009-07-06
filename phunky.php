@@ -17,7 +17,9 @@ class Phunky {
     'plain'      => array('Phunky', 'filter_plain'),
     'javascript' => array('Phunky', 'filter_javascript'),
     'php'        => array('Phunky', 'filter_php'),
-    'silent'     => array('Phunky', 'filter_silent')
+    'silent'     => array('Phunky', 'filter_silent'),
+    'preserve'   => array('Phunky', 'filter_preserve'),
+    'breaker'    => array('Phunky', 'filter_breaker')
   );
   static function filter_plain($text) {
     return $text;
@@ -43,6 +45,17 @@ class Phunky {
   }
   static function filter_silent($_) {
     return "";
+  }
+  static function filter_preserve($text) {
+    # from ruby's haml:
+    # input.chomp("\n").gsub(/\n/, '&#x000A;').gsub(/\r/, '')
+    return preg_replace(
+      "/\r/", "",
+      preg_replace("/\n/", '&#x000A;', rtrim($text, "\n"))
+    );
+  }
+  static function filter_breaker($text) {
+    return preg_replace("/\n/", "<br />\n", $text);
   }
 
   // compiling helpers {{{1
