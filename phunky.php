@@ -19,7 +19,8 @@ class Phunky {
     'php'        => array('Phunky', 'filter_php'),
     'silent'     => array('Phunky', 'filter_silent'),
     'preserve'   => array('Phunky', 'filter_preserve'),
-    'breaker'    => array('Phunky', 'filter_breaker')
+    'breaker'    => array('Phunky', 'filter_breaker'),
+    'css'        => array('Phunky', 'filter_css')
   );
   static function filter_plain($text) {
     return $text;
@@ -56,6 +57,12 @@ class Phunky {
   }
   static function filter_breaker($text) {
     return preg_replace("/\n/", "<br />\n", $text);
+  }
+  static function filter_css($text) {
+    return
+      "<style type='text/css'>\n" .
+      "  " . preg_replace("/\n/", "\n  ", $text) . "\n" .
+      "</style>";
   }
 
   // compiling helpers {{{1

@@ -47,6 +47,7 @@ blocks are equivalent:
   * php
   * preserve
   * breaker (like plain, but inserts <br/> after each line of text)
+  * css (plain css, not sass)
 
 .-------------.
 | Example use |
