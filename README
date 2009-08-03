@@ -17,7 +17,6 @@ implemented.  See below for a list of differences.
 Unimplemented modifiers:
   * < and >
   * ~
-  * !!!
   * |
   * []
 

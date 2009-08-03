@@ -314,6 +314,33 @@ class Phunky {
               $newline .= '>';
             }
           }
+          // doctype {{{3
+          elseif (preg_match('/^!!!\s*(.+)?$/', $line, $m)) {
+            switch($m[1]) {
+            case 'XML':
+              $newline = "<?xml version='1.0' encoding='utf-8' ?>";
+              break;
+            case 'XML iso-8859-1':
+              $newline = "<?xml version='1.0' encoding='iso-8859-1' ?>";
+              break;
+            case '1.1':
+              $newline = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">';
+              break;
+            case 'Strict':
+              $newline = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
+              break;
+            case 'Basic':
+              $newline = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN" "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">';
+              break;
+            case 'Mobile':
+              $newline = '<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.2//EN" "http://www.openmobilealliance.org/tech/DTD/xhtml-mobile12.dtd">';
+              break;
+            case '1.0':
+            case 'Transitional':
+            default:
+              $newline = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
+            }
+          }
           // text node {{{3
           else {
             $newline = $line;
