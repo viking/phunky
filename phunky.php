@@ -6,7 +6,7 @@ class Phunky {
   static function html_attributes($attribs) {
     $retval = '';
     foreach ($attribs as $key => $val) {
-      if (!$val) continue;
+      if ($val === NULL || $val === "") continue;
       $retval .= " $key=\"".htmlspecialchars($val, ENT_COMPAT, "ISO-8859-1", false)."\"";
     }
     return $retval;
